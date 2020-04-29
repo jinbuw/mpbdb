@@ -27,31 +27,7 @@ class FASTA(MIO):
         """ convert resn(3 letter) to 1 letter """
         return self.oneletter[resn]
     
-    
-    def readFasta(self, fp):
-        ccs = self.readTxtFile(fp)
-        reads = {}
-        rid = 0
-        seq = ""
-        read_names = {}
-        for ln in ccs:
-            ln = ln.strip()
-            if not ln or ln.startswith("#"): continue 
-            if ln.startswith(">"): # new sequence #1AQD:G|PDBID|CHAIN|SEQUENCE
-                if seq:
-                    #print "# rid: %4d  seq: %s" % (rid, seq)
-                    reads[rid]=seq
-                    read_names[rid] = seq_name
-                    seq = ""
-                seq_name = strip(ln[1:])
-                rid += 1
-            else:
-                seq += ln 
-        if seq:
-            reads[rid] = seq 
-            read_names[rid] = seq_name
-        return reads, read_names    
-    
+     
     
     def readPDBFasta(self, fp):
         ccs = self.readTxtFile(fp)
@@ -133,39 +109,6 @@ class FASTA(MIO):
         self.allele_seqs[allele_name] = seq     
         assert len(seq) == seq_len
         self.allele_name_seqlen[allele_name] = seq_len
-        
-    def statReads(self, reads):
-        num_reads =len(reads)
-        read_lens = []
-        len_sum = 0
-        read_lens_dt = {}
-        for rid in list(reads.keys()):
-            read_len = len(reads[rid])
-            len_sum += read_len
-            read_lens.append(read_len)
-            read_lens_dt[rid] = read_len
-        read_max_len = max(read_lens)
-        read_min_len = min(read_lens)
-        av_read_len = len_sum/float(num_reads)
-        print("# num_reads=%6d   av_read_len=%7.1f " % (num_reads, av_read_len))
-        print("# max_read_len=%4d  min_read_len=%4d" % (read_max_len, read_min_len))
-        self.read_lens_dt = read_lens_dt
-        if read_max_len != read_min_len: 
-            print("# Warning: non uniform read length")
-        self.read_len = int(av_read_len)
-        self.num_reads = num_reads 
-        
-            
-    def saveFasta(self, fseq, cmt=""):
-        fn_pre = self.fn_pdb[:-4]
-        fn_fasta = "%s.fasta" % fn_pre 
-        lns = []
-        if cmt.startswith(">"):
-            lns.append(cmt)
-        else:
-            lns.append("<%s" % cmt)
-        lns.append(fseq)
-        self.saveLines(lns, fn_fasta, vb=1)        
     
     
     def readPdbSeqs(self, fn_inp):
