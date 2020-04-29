@@ -1,11 +1,5 @@
 # Building HLA allele tree from the aligned MHCI sequence 
-#  based on the following file  
-# file: CLASSI_prot.txt
-# date: 2019-01-23
-# version: IPD-IMGT/HLA 3.35.0
-# origin: http://hla.alleles.org/wmda/CLASSI_prot.txt
-# repository: https://raw.githubusercontent.com/ANHIG/IMGTHLA/Latest/alignments/CLASSI_prot.txt
-# author: WHO, Steven G. E. Marsh (steven.marsh.ac.uk)
+#  based on CLASSI_prot.txt
 
 from Bio import pairwise2
 from Bio.SubsMat import MatrixInfo as matlist
@@ -13,9 +7,9 @@ matrix = matlist.blosum62
 gap_open = -10
 gap_extend = -0.5
 
-from string import digits
-#from libio import MIO
+from string import digits 
 from .libmhcidb import MHCIDBData
+
 class HLAName:
     def alleleName2Protein(self, allele_name):
         """ return allele_protein and allele_gene_group """
@@ -51,7 +45,7 @@ class HLAName:
             return True
     
 
-class HLAAllele(HLAName, MHCIDBData):
+class HLAAllele(MHCIDBData, HLAName):
     MAXLEN = 369  # some of alignments in B only with 369, missing last 3 
     hla_genes = ["A","B","C"]
     def __setAlnSeq(self, fp):
@@ -77,7 +71,7 @@ class HLAAllele(HLAName, MHCIDBData):
         self.add2log("# aligned_seq_bin: {}".format(fp_bin))
         if self.isNew(fp_bin):
             self.__setAlnSeq(self.fn_aln)
-            self.dumpObj(self.aln_seqs, fb_bin, vb=1)
+            self.dumpObj(self.aln_seqs, fp_bin, vb=1)
         else:
             self.aln_seqs = self.loadObj(fp_bin)
         self.num_allele = len(list(self.aln_seqs.keys()))
@@ -119,11 +113,13 @@ class HLAAllele(HLAName, MHCIDBData):
         
     def loadHLAAllele(self, comm_reg=(25,205)):
         """  common region in allele protein sequences """
-        self.setCommonSeqReg(comm_reg)
         self.loadAlignedSeq()
+        self.setHLAAlignedSeqDt()
+        self.__setAlleleGrps() 
+        self.setRefSeq()
+        self.setCommonSeqReg(comm_reg)
         self.loadAlleleGrps()
         self.loadHLAAMSeq()
-        self.setRefSeq()
         
         
     def setHLAAlignedSeqDt(self):
@@ -542,7 +538,7 @@ class HLAAllele(HLAName, MHCIDBData):
             self.setHLAProtSeqs()
             amseqs = self.hla_amseq, self. hla_gene_amseq, self.hla_grp_amseq, self.hla_prot_seq 
             nums = self.hla_num_prot, self.hla_gene_num_prot, self.hla_grp_num_prot  
-            self.dumpObj((nums,amseqs), fn, vb=1)
+            self.dumpObj((nums,amseqs), fp, vb=1)
         self.prnHLAAMSeq() 
     
     

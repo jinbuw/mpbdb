@@ -1,20 +1,36 @@
 from .libio import MIO
+import csv 
+
 class MHCIDBData(MIO):
     """ existing data path and file names 
     """
-    def setMHCIDBPath(self, mhcidb_dirname="MHCIDB"):
-        """ set MHCIDB working directory """
-        cwd = self.getCWD() 
-        pre_dir, after = cwd.split(mhcidb_dirname)
-        self.mhcIdb_path = self.joinPath(pre_dir,mhcidb_dirname )
-        print(("# MHCIDB workding path: {}".format(self.mhcIdb_path)))
+    def __init__(self, args):
+        self.args = args
+        self.UPDATE = args.UPDATE
+        self.data_dir = args.data_dir
+        self.mhcI_db_dir = "MHCIDB"
+        self.setMHCIDBPath(mhcidb_dirname=self.mhcI_db_dir, data_dir=self.data_dir)
         
-        self.mhcIdb_existing_data_path = self.joinPath(self.mhcIdb_path, "existing_data")
+        
+    def __setMHCI_DB_Path(self, mhcidb_dirname):
+        """ set MHCI Database directory path """
+        if not hasattr(self, "mhcIdb_path") or self.mhcIdb_path is None:
+            cwd = self.getCWD() 
+            pre_dir, after = cwd.split(mhcidb_dirname)
+            self.mhcIdb_path = self.joinPath(pre_dir,mhcidb_dirname )
+            print(("# MHCIDB workding path: {}".format(self.mhcIdb_path)))
+    
+                
+    def setMHCIDBPath(self, mhcidb_dirname="MHCIDB", data_dir="existing_data"):
+        """ set MHCIDB working directory path and there existing data  """
+        self.__setMHCI_DB_Path(mhcidb_dirname)
+        self.mhcIdb_existing_data_path = self.joinPath(self.mhcIdb_path, data_dir)
         self.mhcIdb_hla_path = self.joinPath(self.mhcIdb_existing_data_path, "hla" )
         self.mhcIdb_pdb_path = self.joinPath(self.mhcIdb_existing_data_path, "pdb" )
         self.mhcIdb_ba_path = self.joinPath(self.mhcIdb_existing_data_path, "ba" ) 
         self.mhcIdb_pdb3d_path = self.joinPath(self.mhcIdb_pdb_path, "raw_pdbs")
         
+    
     def get_hla_aligned_seq_fp(self):
         """ return the path of the file contains the alinged protein seqeuences of 
         HLA gene A, B and C
@@ -47,6 +63,7 @@ class MHCIDBData(MIO):
         return fp_out_bin
     
     def getMHCIPDBFpBin(self):
+        """ return existing pdbids' filename and path """
         fn = "mhcI_pdbs.bin"
         return self.joinPath(self.mhcIdb_pdb_path, fn)
     
@@ -114,3 +131,51 @@ class MHCIDBData(MIO):
         fp = self.joinPath(self.mhcIdb_pdb_path, fn)
         return fp 
     
+    
+    def saveMPBDB2CSV(self, mpbdb, fn="mpbdb.csv"):
+        """  lig_seq, lig_chain_id, lig_len """
+        with open(fn, 'w') as fh:
+            writer = csv.writer(fh)
+            pdbids = list(mpbdb.keys())
+            pdbids.sort()
+            heads = ["PDBID", "Allele", "Ligand_len", "Ligand_seq", "Binding_operator", "Binding_affinity"]
+            writer.writerow(heads)
+            for pdbid in pdbids:
+                pdb_bds, cnt = mpbdb[pdbid]
+                allele_name = pdb_bds[0][0]
+                if cnt == 0:
+                    bd_opt, ba = "", ""
+                    lig_seq, lig_chain_id, lig_len = self.getLigandSeq(pdbid)
+                    if lig_seq is None:
+                        lig_seq = ''
+                        lig_len = ''
+                    else:
+                        lig_len = len(lig_seq) 
+                elif cnt > 1:
+                    print("#Error: muliple binding affinities for pdb: {} -> {}".format(pdbid, pdb_bds))
+                else:
+                    #print(pdb_bds[0][1])
+                    lig_len, lig_seq, bd_opt, ba = pdb_bds[0][1][0]
+                row = [pdbid, allele_name, lig_len, lig_seq, bd_opt, ba]     
+                writer.writerow(row)
+        print("# Saving Mpdbdb into: {}".format(fn))
+        
+     
+    def loadMHCIPDBLigandSeq(self):
+        fp_bin = self.getMHCILigandFpBin()
+        if self.isNew(fp_bin):
+            fp_fasta = self.getDLFastaFp()
+            self.readPdbSeqs(fp_fasta)
+            #print( self.pdb_seqs)
+            self.mhcI_pdb_ligands_seqs = {}
+            for pdbid in self.mhcI_pdbids:
+                ligand_inf = self.mhcI_pdbs[pdbid][-1]
+                if ligand_inf:
+                    ligand_chain_id = ligand_inf[0][0]
+                    ligand_length = ligand_inf[0][1]
+                    self.mhcI_pdb_ligands_seqs[pdbid] = self.pdb_seqs[pdbid][ligand_chain_id], ligand_chain_id, ligand_length
+            self.dumpObj(self.mhcI_pdb_ligands_seqs, fp_bin, vb=1)
+        else:
+            self.mhcI_pdb_ligands_seqs = self.loadObj(fp_bin)  
+   
+           

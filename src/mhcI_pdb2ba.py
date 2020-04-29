@@ -111,67 +111,82 @@ class MHCIPDB2BA(MHCIDBData, FASTA):
     def MapPDB2Bind(self):
         """ map MHCI PDB to binding affinity """
         self.mhcI_pdb_2_bd = {}
-        num_w_lig = 0 
         self.mhcI_pdb_bd_liglen  = {}
+        self.num_mapped_pdb = 0 
         for pdbid in self.matched_pdbs:
             if len(self.matched_pdbs[pdbid]) == 2:
                  continue 
             ma_names, mns, mdifs = self.matched_pdbs[pdbid]
-            #print("#pdbid: {} ma_names: {}".format(pdbid, ma_names))
-            try:
-                lig_seq, lig_chain_id, lig_len = self.getLigandSeq(pdbid)
-            except TypeError:
-                lig_seq = None
-            #if lig_seq:
-            #    print("# lig_seq: {} lig_len: {}".format(lig_seq, lig_len))    
-            pdb_bds = []
-            cnt = 0 
-            for name in ma_names:
-                ba_name = self.alleleProt2BindAllele(name)
-                if ba_name not in self.mhcI_bind_data:
-                    continue 
-                if lig_seq:
-                    #print("# ba_name: {}".format(ba_name))
-                    mbds = self.mapBindLigand(ba_name, lig_seq, lig_len)
-                    num_mbds = len(mbds)
-                    cnt += num_mbds
-                    if num_mbds > 0:
-                        for bd in mbds:
-                            lig_len = int(bd[0])
-                            if lig_len in self.mhcI_pdb_bd_liglen:
-                                if pdbid in self.mhcI_pdb_bd_liglen[lig_len]:
-                                    self.mhcI_pdb_bd_liglen[lig_len][pdbid].append(bd)
-                                else:
-                                    self.mhcI_pdb_bd_liglen[lig_len][pdbid] = [bd]
-                            else:
-                                self.mhcI_pdb_bd_liglen[lig_len] = {pdbid:[bd]}
-                    pdb_bds.append((ba_name, mbds))
-                else:
-                    pdb_bds.append((ba_name, []))
-            
-            if pdb_bds:
-                self.mhcI_pdb_2_bd[pdbid] = pdb_bds, cnt 
-                #print(pdbid, pdb_bds)
-                if cnt > 0:
-                    print("#*** matched mhcI-pep: {} lig_len:{}  lig_seq:{}".format(pdbid, lig_len, lig_seq))
-                    num_w_lig += 1
-                    #print(pdb_bds)
-                    #break 
-                    if cnt > 1:
-                        print("#multi_bind: {} -> {}".format(pdbid,pdb_bds))
+            lig_seq, lig_chain_id, lig_len = self.getLigandSeq(pdbid)
+            pdb_bds, cnt  = self.__getMappedPDBBD(pdbid, ma_names, lig_seq)
+            self.__addMappedPDBBD(pdbid, pdb_bds,lig_seq, cnt)
         num_m_pdb = len(self.mhcI_pdb_2_bd)
-        ln = "# num_matched_pdb: {}  num_match_mhcI-pep: {}".format(num_m_pdb, num_w_lig)
-        #print(ln)
+        ln = "# num_matched_pdb: {}  num_match_mhcI-pep: {}".format(num_m_pdb, self.num_mapped_pdb)
         self.add2log(ln, prn=1)
+    
+    
+    def __addMappedPDBBD(self, pdbid, pdb_bds, lig_seq, cnt):
+        """ Add mapped pdb bindings to mpbdb dictionary """
+        if pdb_bds:
+            self.mhcI_pdb_2_bd[pdbid] = pdb_bds, cnt 
+            #print(pdbid, pdb_bds)
+            if cnt > 0:
+                print("#*** matched mhcI-pep: {} lig_len:{}  lig_seq:{}".format(pdbid, len(lig_seq), lig_seq))
+                self.num_mapped_pdb += 1
+                if cnt > 1:
+                    print("#multi_bind: {} -> {}".format(pdbid,pdb_bds))
+
+         
+        
+    def __getMappedPDBBD(self, pdbid, ma_names, lig_seq):
+        pdb_bds = []
+        cnt = 0 
+        for name in ma_names:
+            ba_name = self.alleleProt2BindAllele(name)
+            if ba_name not in self.mhcI_bind_data:
+                continue 
+            if lig_seq:
+                #print("# ba_name: {}".format(ba_name))
+                mbds = self.mapBindLigand(ba_name, lig_seq, len(lig_seq))
+                cnt += len(mbds)
+                self.addMappedBds2Liglen(pdbid, mbds) 
+                pdb_bds.append((ba_name, mbds))
+            else:
+                pdb_bds.append((ba_name, []))
+        return pdb_bds, cnt 
+                
+           
+    def saveMPBDB2Bin(self):
+        """ Save PDBs with binding affinity into a binary file """
         fn = "mhcI_pdb_2_bind.bin"
-        self.dumpObj(self.mhcI_pdb_2_bd, fn, vb=1)
+        fp = self.joinPath(self.mhcIdb_pdb_path, fn)
+        self.dumpObj(self.mhcI_pdb_2_bd, fp, vb=1)
+        
+        fn = "mhcI_pdb_bd_liglen.bin"
+        fp = self.joinPath(self.mhcIdb_pdb_path, fn)
+        self.dumpObj(self.mhcI_pdb_bd_liglen, fp, vb=1)
+        
+        
+    def ligLenStat2Log(self):
+        """ Add matched ligands' length statistics to log file """
         lig_lens = list(self.mhcI_pdb_bd_liglen.keys())
         lig_lens.sort()
         for lig_len in lig_lens:
             ln = "# pdb2bd: lig_len={}  num_pdb: {}".format(lig_len, len(self.mhcI_pdb_bd_liglen[lig_len]))
             self.add2log(ln, prn=1)
-        fn = "mhcI_pdb_bd_liglen.bin"
-        self.dumpObj(self.mhcI_pdb_bd_liglen, fn, vb=1)
+
+        
+    def addMappedBds2Liglen(self, pdbid, mbds):
+        for bd in mbds:
+            lig_len = int(bd[0])
+            if lig_len in self.mhcI_pdb_bd_liglen:
+                if pdbid in self.mhcI_pdb_bd_liglen[lig_len]:
+                    self.mhcI_pdb_bd_liglen[lig_len][pdbid].append(bd)
+                else:
+                    self.mhcI_pdb_bd_liglen[lig_len][pdbid] = [bd]
+            else:
+                self.mhcI_pdb_bd_liglen[lig_len] = {pdbid:[bd]}
+                
       
     def testMap(self):
         """ test map MHCI PDB to binding affinity """
@@ -245,28 +260,12 @@ class MHCIPDB2BA(MHCIDBData, FASTA):
     
     
     def getLigandSeq(self, pdbid):
+        """ return lig_seq, lig_chain_id, lig_len  """
         if pdbid in self.mhcI_pdb_ligands_seqs:
             return self.mhcI_pdb_ligands_seqs[pdbid]
-        
-        
-    def loadMHCIPDBLigandSeq(self):
-        fp_bin = self.getMHCILigandFpBin()
-        if self.isNew(fp_bin):
-            fp_fasta = self.getDLFastaFp()
-            self.readPdbSeqs(fp_fasta)
-            #print( self.pdb_seqs)
-            self.mhcI_pdb_ligands_seqs = {}
-            for pdbid in self.mhcI_pdbids:
-                ligand_inf = self.mhcI_pdbs[pdbid][-1]
-                if ligand_inf:
-                    ligand_chain_id = ligand_inf[0][0]
-                    ligand_length = ligand_inf[0][1]
-                    self.mhcI_pdb_ligands_seqs[pdbid] = self.pdb_seqs[pdbid][ligand_chain_id], ligand_chain_id, ligand_length
-            self.dumpObj(self.mhcI_pdb_ligands_seqs, fp_bin, vb=1)
         else:
-            self.mhcI_pdb_ligands_seqs = self.loadObj(fp_bin)  
-            
-    
+            return None, None, None
+   
     
     def listPDBIDS(self):
         fn = "mhcI_pdb_2_bind.bin"
@@ -309,18 +308,21 @@ class MHCIPDB2BA(MHCIDBData, FASTA):
         lns += self.prnBlockList(pdbids)
         self.prnLines(lns)
         
+        
     def start(self):
-        self.setMHCIDBPath()
+        self.setMHCIDBPath(data_dir=self.args.data_dir)
         self.loadMHCIBindData()
         self.statMHCIBindAllele()
         self.statMHCBindLiglen()
         self.loadMHCIPDB2AlleleData()
         self.loadMHCIPDBInf()
         self.loadMHCIPDBLigandSeq()
-        #self.MapPDB2Bind()
+        self.MapPDB2Bind()
+        self.saveMPBDB2Bin()
+        self.saveMPBDB2CSV(self.mhcI_pdb_2_bd)
         #self.testMap()
         #self.listPDBIDS() 
-        self.listPdbPep()
+        #self.listPdbPep()
         
 if  __name__ == "__main__":
     import argparse, sys 
@@ -332,13 +334,13 @@ if  __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="%s" % __file__, description="cluster pdbs by their sequences")
     parser.add_argument("-v","--version", action='version', version='%(prog)s 1.0')
     
-    parser.add_argument("-f", "--filename",dest="fn_fasta", default=None,
-                        help="input fasta filename")             
-
-    parser.add_argument("-O","--printout", dest="prnout",  action="store_true",  default=False,
-                        help="print aligned sequence")    
+    parser.add_argument("-d", "--data_dir",dest="data_dir", default="example_data",
+                        help="input existed  data directory")   
+  
+    parser.add_argument("-u","--update", dest="UPDATE",  action="store_true",  default=False,
+                        help="Update all existing binary files")       
+      
     args =parser.parse_args()    
-    
     tobj = MHCIPDB2BA(args)
     tobj.start()
           

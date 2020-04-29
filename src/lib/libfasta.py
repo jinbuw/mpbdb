@@ -85,7 +85,22 @@ class FASTA(MIO):
                 pdb_seqs[pdbid] = {}            
             pdb_seqs[pdbid][chain_id] = seq 
         return pdb_seqs            
-
+    
+    def write_PDB_fasta(self, pdb_seqs, fn_fasta, pdbids=None, vb=0):
+        """ Write PDB  chain sequence(s) into a fasta file """
+        if pdbids is None:
+            pdbids = list(seqs.keys())
+        pdbids.sort()
+        lns = []
+        for pdbid in pdbids:
+            chain_ids = list(pdb_seqs[pdbid].keys())
+            chain_ids.sort()
+            for chain_id in chain_ids:
+                lns.append(">{}:{}|PDBID|CHAIN:SEQUENCE".format(pdbid, chain_id))
+                lns.append(pdb_seqs[pdbid][chain_id])
+        self.saveLines(lns, fn_fasta, vb=vb)
+        
+        
     def readAlleleFasta(self, fp):
         """ read allele's fasta file and parse allele name, sequence length:
         >HLA:HLA08460 A*01:118 181 bp
@@ -151,9 +166,6 @@ class FASTA(MIO):
             lns.append("<%s" % cmt)
         lns.append(fseq)
         self.saveLines(lns, fn_fasta, vb=1)        
-        
-    def saveAlleleFasta(self, allele_id,  allele, seq):
-        pass 
     
     
     def readPdbSeqs(self, fn_inp):
@@ -166,8 +178,6 @@ class FASTA(MIO):
         
 class FilterMHCbySeq(FASTA):
     """ filter MHC class II pdbs by their sequences """
-
-    
     def rmMultimers(self):
         #pdb_rm_chains = {}
         self.pdb_mono_chains = {}
@@ -191,7 +201,6 @@ class FilterMHCbySeq(FASTA):
             self.add2log("# {} : mono {}  {}".format(pdbid, mono_chains, chain_inf))
             self.add2log("# pdbid: {}  rm_chains: {}".format(pdbid, _rm_chains))
             self.pdb_mono_chains[pdbid] = mono_chains
-            
                 
     def filterPDBbySeqLen(self, min_chain_len=160, min_pep_len= 3,  max_pep_len=30):
         """ filter out longest chain lenth < 160, maximum binding peptide length= 30  """
@@ -206,8 +215,6 @@ class FilterMHCbySeq(FASTA):
             num_valid_chain = 0
             _pdbseq = self.pdb_seqs[pdbid]
             ln = "%s: " % pdbid
-            #chain_ids = list(_pdbseq.keys())
-            #chain_ids.sort()
             LIGSTAT = True
             for chain_id in self.pdb_mono_chains[pdbid]: 
                 chain_len = len(_pdbseq[chain_id])
@@ -219,10 +226,8 @@ class FilterMHCbySeq(FASTA):
                         stat_ligand.setdefault(chain_len,[]).append(pdbid)
                         LIGSTAT = False
                 ln += "%s:%-5s"  % (chain_id, chain_len)
-            #print ln 
             self.add2log(ln)
             if num_valid_chain  < 1:
-                #print "# pdb: %4s  is not valide MHCI " % pdbid
                 self.add2log("# pdb: %4s  is not valide MHCI " % pdbid)
                 num_not_valid += 1
                 not_valid_pdbs.append((pdbid, num_valid_chain))

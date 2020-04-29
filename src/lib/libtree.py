@@ -179,7 +179,7 @@ class Tree:
         for nid in list(self.nodes.keys()):
             print(self.nodes[nid]) 
 
-class HLATree(Tree, HLAAllele):
+class HLATree(HLAAllele, Tree):
     dup_prots = ["C*07:722","A*02:768","C*03:460", "C*15:176","C*12:228"]
     def isDupProtSeq(self, prot):
         if prot in self.dup_prots:

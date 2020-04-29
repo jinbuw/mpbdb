@@ -3,13 +3,8 @@
 from lib.libtree import HLATree
 from lib.libfasta import FASTA
 
-class Seq2Allele(HLATree, FASTA):
+class PdbSeq2Allele(HLATree, FASTA):
     """ map aligned protein sequence to allele protein sequence """
-    def __init__(self, args):
-        self.args = args 
-        self.UPDATE = False
-        self.setMHCIDBPath()
-    
     def loadMHCIPDBSeq(self):
         """ mhci_pdbs[pdbid] = [(chain_ids, chain_seq(xxx,...), [ligand chains]), ...] """
         fp = self.getMHCIPDBFpBin()
@@ -18,9 +13,8 @@ class Seq2Allele(HLATree, FASTA):
         self.mhcI_pdb_alpha_seqs = {}
         for pdbid in self.mhcI_pdbids:
             alpha_seq = self.mhcI_pdbs[pdbid][1]
-            #print(alpha_seq)
             self.mhcI_pdb_alpha_seqs[pdbid] = self.seq2fasta(alpha_seq)
-        #print(self.mhcI_pdb_alpha_seqs) #seqs)
+    
         
     def loadMHCIPDB2Allele(self):
         fp_bin  = self.getPDB2ALLeleFpBin()
@@ -80,7 +74,6 @@ class Seq2Allele(HLATree, FASTA):
     def start(self):
         self.loadHLAAllele() 
         self.createDTree()
-        self.setRefSeq()
         self.loadMHCIPDBSeq() 
         self.setCommonSeqReg((25,206))
         #self.prnComonRefSeq()
@@ -135,30 +128,21 @@ class Seq2Allele(HLATree, FASTA):
         prot_seq = self.getProtSeq(prot)
         node = self.getNode(node_name=grp) #"C*14")
         node.getPossMChildren(prot_seq, vb=1)        
-
-        
+    
         
 if  __name__ == "__main__":
     import argparse, sys 
-    cmd = " ".join(sys.argv)
-    cmd_lns = [ "\n---------------------------"]
-    cmd_lns += [ "Runing: python %s" % cmd, "#    aligned two sequences with affine gap penalty" ]
-    cmd_lns += ["---------------------------\n"]
-        
     parser = argparse.ArgumentParser(prog="%s" % __file__, description="cluster pdbs by their sequences")
     parser.add_argument("-v","--version", action='version', version='%(prog)s 1.0')
+     
+    parser.add_argument("-d", "--data_dir",dest="data_dir", default="example_data",
+                        help="input existed  data directory")   
     
-    parser.add_argument("-f", "--filename",dest="fn_fasta", default=None,
-                        help="input fasta filename")             
-
-    parser.add_argument("-O","--printout", dest="prnout",  action="store_true",  default=False,
-                        help="print aligned sequence")    
+    parser.add_argument("-u","--update", dest="UPDATE",  action="store_true",  default=False,
+                        help="Update all existing binary files")       
+    
     args =parser.parse_args()    
-    import time 
-    t1 =time.time()
-    tobj = Seq2Allele(args)
+    tobj = PdbSeq2Allele(args)
     tobj.start()
-    t2 = time.time()
-    print(("# used_time={:.1f}(secs)".format(t2-t1)))
     
       
