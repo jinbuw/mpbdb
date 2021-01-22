@@ -153,14 +153,18 @@ class FilterMHCbySeq(FASTA):
         num_not_valid = 0
        
         stat_ligand = {}
+        excluded_pdb_infs = []
         for pdbid in self.pdbids:
             num_ligand  = 0
             num_valid_chain = 0
             _pdbseq = self.pdb_seqs[pdbid]
             ln = "%s: " % pdbid
             LIGSTAT = True
+            #print("pdb_mono_chains: ",  self.pdb_mono_chains)
+            pdb_chain_lens = []
             for chain_id in self.pdb_mono_chains[pdbid]: 
                 chain_len = len(_pdbseq[chain_id])
+                pdb_chain_lens.append((chain_len, chain_id))
                 if chain_len > min_chain_len:
                     num_valid_chain += 1
                 elif chain_len < max_pep_len and chain_len > min_pep_len:
@@ -171,6 +175,10 @@ class FilterMHCbySeq(FASTA):
                 ln += "%s:%-5s"  % (chain_id, chain_len)
             self.add2log(ln)
             if num_valid_chain  < 1:
+                pdb_chain_lens.sort(reverse=True)
+                max_chain_len, chain_id = pdb_chain_lens[0]
+                excluded_pdb_infs.append((max_chain_len, chain_id, pdbid))
+                self.add2log("pdbid: {} long chain: {}".format(pdbid, pdb_chain_lens[0])) 
                 self.add2log("# pdb: %4s  is not valide MHCI " % pdbid)
                 num_not_valid += 1
                 not_valid_pdbs.append((pdbid, num_valid_chain))
@@ -178,6 +186,13 @@ class FilterMHCbySeq(FASTA):
                 no_ligand_pdbs.append(pdbid)
             else:
                 valid_pdbs.append(pdbid)
+            #break 
+        excluded_pdb_infs.sort()
+        se_len, se_chain, se_pdbid  = excluded_pdb_infs[0]
+        le_len, le_chain, le_pdbid = excluded_pdb_infs[-1]
+        ln = "# excluded pdbs by seq: shortest: {} {} {}  -- longest: {} {} {}".format(se_len, se_chain, se_pdbid, le_len, le_chain, le_pdbid)
+        print(ln)
+        self.add2log(ln)
         self.saveFilterPDB(valid_pdbs, no_ligand_pdbs, not_valid_pdbs,stat_ligand)        
     
     

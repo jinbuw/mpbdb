@@ -84,9 +84,12 @@ class Node(object):
                 num_res += 1 
                 if seq[sid] == self.anchor_seq[sid]:
                     cnt += 1
-        sim = cnt/num_res
-        if self.DB: print(("#anchor: cnt: {}  len:{}  sim:{}".format(cnt, num_res,sim)))
-        return sim 
+        if num_res == 0:
+            return 1.0
+        else:
+            sim = cnt/num_res
+            if self.DB: print(("#anchor: cnt: {}  len:{}  sim:{}".format(cnt, num_res,sim)))
+            return sim 
     
     
     def __getMajorSim(self, seq):

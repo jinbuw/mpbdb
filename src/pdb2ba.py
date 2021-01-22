@@ -320,6 +320,8 @@ class MHCIPDB2BA(MHCIDBData, FASTA):
         self.MapPDB2Bind()
         self.saveMPBDB2Bin()
         self.saveMPBDB2CSV(self.mhcI_pdb_2_bd)
+        self.ligLenStat2Log()
+        self.saveLog("pdb2ba.log")
         #self.testMap()
         #self.listPDBIDS() 
         #self.listPdbPep()

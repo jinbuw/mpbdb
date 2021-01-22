@@ -104,7 +104,7 @@ class PDB2MHCI(MHCIDBData, FilterMHCbySeq):
     def start(self):
         #self.UPDATE = True
         self.loadFilteredPDBbySeq() 
-        self.filteredBy3D() 
+        #self.filteredBy3D() 
         #self.statMHCIPDB()
         #self.testPDB("2c7u", vb=1)
         #self.testPDB("4QRQ", vb=1)

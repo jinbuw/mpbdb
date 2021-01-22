@@ -2141,6 +2141,9 @@ class MHCIPDB(PDB):
         3/4 beta sheets between first and second long helices """
         #print "# possible alpha chains: ", self.possible_alpha_chain_ids
         self.mhcI_alphas = []
+        self.tpt_drs = []
+        self.dist_range = 20
+        
         for chain_id, chain_length in self.possible_alpha_chain_ids:
             helices, hids = self.getChainHelix(chain_id)
             long_helices = self.mergeHelices(helices, hids)
@@ -2155,6 +2158,8 @@ class MHCIPDB(PDB):
                     num_bsheet = len(mhcI_bind_sheet_ids)
                     if num_bsheet == 1:
                         self.mhcI_alphas.append((chain_id, mhcI_bind_sheet_ids[0]))
+                        sheet_range_ressids = self.getBetaSheetResSids(sheets[mhcI_bind_sheet_ids[0]])
+                        self.getBindingGrooveTemplateDrs(long_helices, sheet_range_ressids)  
                     elif num_bsheet > 1:
                         self.add2log("# Error in find mhcI alpha for chain: %s" % chain_id)
                         self.add2log("# mhcI_bind_sheet: %s" %  mhcI_bind_sheet_ids)     
@@ -2167,8 +2172,93 @@ class MHCIPDB(PDB):
                     pass 
                 
         #return mhcI_alphas
-            
+    
+    def getBetaSheetResSids(self, sheet):
+        range_ressids = []
+        for strand_sid in sheet:
+            strand = sheet[strand_sid]
+            ss_resid = strand["start_resid"]
+            se_resid = strand["end_resid"]
+            s_chain = strand["start_chain_id"]
+            ss_res_sid = self.resid2ResSid(ss_resid, chain_id=s_chain)
+            se_res_sid = self.resid2ResSid(se_resid, chain_id=s_chain)
+            range_ressids += range(ss_res_sid, se_res_sid)
+        return range_ressids
+       
 
+    def getSeg2SegMinDr(self, seg_ressids, range_ressids, atom="CA"):
+        min_dr = 100
+        min_res_sids = -1, -1
+        for src_ressid in seg_ressids:
+            for res_sid in range_ressids:
+                dr = self.getAnyAtomDist(src_ressid, atom, res_sid, atom)
+                if dr < min_dr:
+                    min_dr = dr 
+                    min_res_sids = src_ressid, res_sid
+        return min_dr, min_res_sids
+  
+  
+    def getBindingGrooveTemplateDrs(self, long_helices, sheet_range_ressids):
+        tpt_drs = []
+        #self.getAnyAtomDist(res_sid1, atom1, res_sid2, atom2)
+        helix1_sressid, helix1_eressid = self.getHelixTermRessids(long_helices[0])
+        helix2_sressid, helix2_eressid  = self.getHelixTermRessids(long_helices[1])
+        
+        t1_src_ressid = helix1_sressid + 9  
+        tgt_ressids = range(helix2_eressid, helix2_eressid - self.dist_range, -1)
+        t1_min_dr, t1_min_ressids = self.getSeg2SegMinDr(range(t1_src_ressid, t1_src_ressid +5), tgt_ressids)
+        res1 = self.resSid2Res(t1_min_ressids[0])
+        res2 = self.resSid2Res(t1_min_ressids[1])
+        print("#t1:         res: {:4d}/{}/{}  -- res: {:4d}/{}/{}: dist= {:.4f}".format(res1.resid, res1.name, res1.chain_id, \
+                                                                                   res2.resid, res2.name, res2.chain_id, t1_min_dr))
+        tpt_drs.append((t1_min_dr, res1.resid, res1.name, res1.chain_id, res2.resid, res2.name, res2.chain_id))
+        
+        t2_src_ressid = helix1_eressid #- 10
+        tgt_ressids = range( helix2_sressid, helix2_sressid+ self.dist_range)
+        t2_min_dr, t2_min_ressids = self.getSeg2SegMinDr(range(t2_src_ressid, t2_src_ressid+5),tgt_ressids)
+        res1 = self.resSid2Res(t2_min_ressids[0])
+        res2 = self.resSid2Res(t2_min_ressids[1])
+        #print("#t2: ressid: {:4d}  -- ressid {:4d}: dist= {:.4f}".format(helix1_eressid, t2_min_ressid, t2_min_dr))
+        print("#t2:         res: {:4d}/{}/{}  -- res: {:4d}/{}/{}: dist= {:.4f}".format(res1.resid, res1.name, res1.chain_id, \
+                                                                                res2.resid, res2.name, res2.chain_id, t2_min_dr))
+        tpt_drs.append((t2_min_dr, res1.resid, res1.name, res1.chain_id, res2.resid, res2.name, res2.chain_id))
+
+        
+        helix1_mid_ressid = helix1_eressid - 14 #(helix1_sressid + helix1_eressid)/2 
+        mid_range = 8 
+        tgt_ressids = range(helix2_sressid+mid_range, helix2_eressid-mid_range+1)
+        mid_min_dr, mid_min_ressids = self.getSeg2SegMinDr(range(helix1_mid_ressid, helix1_mid_ressid+5), tgt_ressids)
+        #print("#mid ressid: {:4d}  -- ressid {:4d}: dist= {:.4f}".format(helix1_mid_ressid, mid_min_ressid, mid_min_dr))
+        res1 = self.resSid2Res(mid_min_ressids[0])
+        res2 = self.resSid2Res(mid_min_ressids[1])
+        #print("#t2: ressid: {:4d}  -- ressid {:4d}: dist= {:.4f}".format(helix1_eressid, t2_min_ressid, t2_min_dr))
+        print("#mid:        res: {:4d}/{}/{}  -- res: {:4d}/{}/{}: dist= {:.4f}".format(res1.resid, res1.name, res1.chain_id, \
+                                                                                res2.resid, res2.name, res2.chain_id, mid_min_dr))
+        tpt_drs.append((mid_min_dr, res1.resid, res1.name, res1.chain_id, res2.resid, res2.name, res2.chain_id))
+
+        
+        helix1_mid2sheet_min_dr, h1m_ressids = self.getSeg2SegMinDr(range(helix1_mid_ressid, helix1_mid_ressid+5), sheet_range_ressids)
+        #print("#h1 mid2sheet ressid: {:4d}  -- ressid {:4d}: dist= {:.4f}".format(helix1_mid_ressid, h1m_ressid, helix1_mid2sheet_min_dr))
+        res1 = self.resSid2Res(h1m_ressids[0])
+        res2 = self.resSid2Res(h1m_ressids[1])
+        #print("#t2: ressid: {:4d}  -- ressid {:4d}: dist= {:.4f}".format(helix1_eressid, t2_min_ressid, t2_min_dr))
+        print("#h1mid2sheet res: {:4d}/{}/{}  -- res: {:4d}/{}/{}: dist= {:.4f}".format(res1.resid, res1.name, res1.chain_id, \
+                                                               res2.resid, res2.name, res2.chain_id, helix1_mid2sheet_min_dr))
+        tpt_drs.append((helix1_mid2sheet_min_dr, res1.resid, res1.name, res1.chain_id, res2.resid, res2.name, res2.chain_id))
+
+        
+        helix2_mid_ressid = (helix2_sressid + helix2_eressid)/2
+        helix2_mid2sheet_min_dr, h2m_ressids = self.getSeg2SegMinDr(range(helix2_mid_ressid, helix2_mid_ressid+5), sheet_range_ressids)
+        #print("#h2 mid2sheet res: {:4d}  -- res {:4d}: dist= {:.4f}".format(helix2_mid_ressid, h2m_ressid, helix2_mid2sheet_min_dr))
+        res1 = self.resSid2Res(h2m_ressids[0])
+        res2 = self.resSid2Res(h2m_ressids[1])
+        #print("#t2: ressid: {:4d}  -- ressid {:4d}: dist= {:.4f}".format(helix1_eressid, t2_min_ressid, t2_min_dr))
+        print("#h2mid2sheet res: {:4d}/{}/{}  -- res: {:4d}/{}/{}: dist= {:.4f}".format(res1.resid, res1.name, res1.chain_id, \
+                                                               res2.resid, res2.name, res2.chain_id, helix2_mid2sheet_min_dr))
+        tpt_drs.append((helix2_mid2sheet_min_dr, res1.resid, res1.name, res1.chain_id, res2.resid, res2.name, res2.chain_id))
+        #print(tpt_drs)
+        self.tpt_drs.append(tpt_drs)
+    
     def findMHCIBindSheet(self, bind_sheet_ids, sheets, long_helices, vb=0):
         #print bind_sheet_ids
         first_helix_start_resid = long_helices[0][0]
